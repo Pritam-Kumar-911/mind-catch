@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MeetMind — Never Miss a Word Again" },
+      { title: "MeetMind — Turn Conversations Into Clarity" },
       { name: "description", content: "AI-powered meeting notes, summaries and action items generated in real time." },
-      { property: "og:title", content: "MeetMind — Never Miss a Word Again" },
+      { property: "og:title", content: "MeetMind — Turn Conversations Into Clarity" },
       { property: "og:description", content: "AI-powered meeting notes, summaries and action items generated in real time." },
     ],
   }),
@@ -69,8 +69,8 @@ function Landing() {
           </div>
 
           <h1 className="mt-8 text-5xl sm:text-7xl md:text-[5.5rem] font-bold tracking-tight leading-[1.05] animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-            Never Miss a <br className="hidden sm:block" />
-            <span className="text-gradient-brand animate-gradient">Word Again.</span>
+            Turn Conversations <br className="hidden sm:block" />
+            Into <span className="text-gradient-brand animate-gradient">Clarity.</span>
           </h1>
           <p className="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-muted-foreground animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
             AI-powered meeting notes, summaries, action items and quizzes —
@@ -134,9 +134,9 @@ function Landing() {
                       </div>
                     </div>
                     <div className="space-y-2.5 text-sm">
-                      <p><span className="text-gradient-brand font-semibold">Sara:</span> <span className="text-muted-foreground">Let's review the Q4 roadmap before we close.</span></p>
-                      <p><span className="text-gradient-brand font-semibold">Ali:</span> <span className="text-muted-foreground">Marketing wants the launch by November 15th.</span></p>
-                      <p><span className="text-gradient-brand font-semibold">Hassan:</span> <span className="text-muted-foreground">Analytics dashboard needs another week to be ready</span><span className="inline-block w-1.5 h-3.5 bg-brand-purple animate-pulse align-middle ml-1" /></p>
+                      <p className="text-muted-foreground">Let's review the Q4 roadmap before we close.</p>
+                      <p className="text-muted-foreground">Marketing wants the launch by November 15th.</p>
+                      <p className="text-muted-foreground">Analytics dashboard needs another week to be ready<span className="inline-block w-1.5 h-3.5 bg-brand-purple animate-pulse align-middle ml-1" /></p>
                     </div>
                   </div>
                   {/* AI col */}
@@ -170,20 +170,6 @@ function Landing() {
                 <div className="text-2xl sm:text-3xl font-bold text-gradient-brand">{s.value}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{s.label}</div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* TRUSTED BY */}
-      <section className="border-y border-border/40 py-10 bg-surface/30">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <p className="text-center text-xs font-semibold tracking-widest text-muted-foreground uppercase mb-6">
-            Trusted by teams & students at
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 opacity-60">
-            {["LUMS", "NUST", "FAST", "IBA", "GIK", "Habib University"].map((n) => (
-              <span key={n} className="text-base sm:text-lg font-bold tracking-tight">{n}</span>
             ))}
           </div>
         </div>

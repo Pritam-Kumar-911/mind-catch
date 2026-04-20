@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Square, Mic, StopCircle, Users, Volume2, Pause, Play, Settings,
+  Square, Mic, StopCircle, Volume2, Pause, Play, Settings,
   MessageSquare, Sparkles, ListChecks, Target, HelpCircle, Download,
   Languages, Wifi,
 } from "lucide-react";
@@ -21,14 +21,7 @@ export const Route = createFileRoute("/live")({
   component: LiveSession,
 });
 
-const SCRIPT = `Sara: Welcome everyone to today's product sync. Let's start with the Q4 roadmap. Ali: Marketing has confirmed the launch window for November 15th, but we still need engineering sign-off on the new onboarding flow. Sara: Got it. I'll schedule a review with the design team tomorrow. Hassan: Quick note — the analytics dashboard needs another week before it's production ready. Sara: Understood, let's move that to phase two. Any blockers from QA? Aisha: We need test accounts for the new payment integration by Friday.`.split(" ");
-
-const PARTICIPANTS = [
-  { name: "Sara", color: "from-brand-blue to-brand-purple", speaking: true },
-  { name: "Ali", color: "from-brand-purple to-brand-pink", speaking: false },
-  { name: "Hassan", color: "from-brand-pink to-brand-purple", speaking: false },
-  { name: "Aisha", color: "from-brand-blue to-brand-pink", speaking: false },
-];
+const SCRIPT = `Welcome to today's product sync. Let's start with the Q4 roadmap. Marketing has confirmed the launch window for November 15th, but we still need engineering sign-off on the new onboarding flow. We'll schedule a review with the design team tomorrow. Quick note — the analytics dashboard needs another week before it's production ready, so let's move that to phase two. From the QA side, we need test accounts for the new payment integration by Friday.`.split(" ");
 
 function LiveSession() {
   const [words, setWords] = useState<string[]>([]);
@@ -88,26 +81,6 @@ function LiveSession() {
       </div>
 
       <div className="flex-1 mx-auto max-w-[1400px] w-full px-4 sm:px-6 py-6">
-        {/* Participants strip */}
-        <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{PARTICIPANTS.length} participants</span>
-          </div>
-          <div className="flex -space-x-2">
-            {PARTICIPANTS.map((p) => (
-              <div key={p.name} className="relative">
-                <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${p.color} flex items-center justify-center text-white text-xs font-bold ring-2 ring-background`}>
-                  {p.name[0]}
-                </div>
-                {p.speaking && (
-                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-background animate-pulse" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
         <div className="grid lg:grid-cols-[1.3fr_1fr] gap-5 h-[calc(100vh-260px)] min-h-[520px]">
           {/* TRANSCRIPT */}
           <div className="gradient-border rounded-2xl flex flex-col overflow-hidden">
@@ -128,7 +101,7 @@ function LiveSession() {
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 leading-relaxed text-[15px]">
               {words.map((w, i) => (
                 <span key={i} className="animate-fade-in-up" style={{ animationDuration: "0.4s" }}>
-                  {w.endsWith(":") ? <strong className="text-gradient-brand font-semibold">{w} </strong> : <>{w} </>}
+                  {w}{" "}
                 </span>
               ))}
               {!paused && <span className="inline-block w-2 h-5 bg-brand-purple align-middle animate-pulse" />}
@@ -173,16 +146,16 @@ function LiveSession() {
                 </TabsContent>
                 <TabsContent value="actions" className="mt-0 space-y-2">
                   {[
-                    { t: "Schedule design review with onboarding team", o: "Sara", d: "Tomorrow" },
-                    { t: "Provide test accounts for payment integration", o: "Aisha", d: "Friday" },
-                    { t: "Move analytics dashboard to phase two backlog", o: "Hassan", d: "This week" },
-                    { t: "Send launch comms draft to marketing", o: "Ali", d: "Nov 10" },
+                    { t: "Schedule design review with onboarding team", d: "Tomorrow" },
+                    { t: "Provide test accounts for payment integration", d: "Friday" },
+                    { t: "Move analytics dashboard to phase two backlog", d: "This week" },
+                    { t: "Send launch comms draft to marketing", d: "Nov 10" },
                   ].map((a, i) => (
                     <label key={i} className="flex gap-3 items-start p-3 rounded-lg hover:bg-accent/40 cursor-pointer transition group">
                       <Square className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0 group-hover:text-brand-purple transition" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm">{a.t}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{a.o} · due {a.d}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">due {a.d}</p>
                       </div>
                     </label>
                   ))}

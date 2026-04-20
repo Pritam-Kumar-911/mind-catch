@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   FileText, ListChecks, Lightbulb, HelpCircle, Mail,
   Save, Download, Send, Share2, Copy, Check, ChevronDown, Calendar,
-  Users, Clock, Languages, TrendingUp, Sparkles,
+  Clock, Languages, TrendingUp, Sparkles,
 } from "lucide-react";
 
 export const Route = createFileRoute("/results")({
@@ -21,10 +21,10 @@ export const Route = createFileRoute("/results")({
 });
 
 const ACTIONS = [
-  { task: "Schedule design review with onboarding team", owner: "Sara", due: "Tomorrow", priority: "high" },
-  { task: "Provide test accounts for payment integration", owner: "Aisha", due: "Friday", priority: "high" },
-  { task: "Move analytics dashboard to phase two backlog", owner: "Hassan", due: "This week", priority: "med" },
-  { task: "Send launch comms draft to marketing", owner: "Ali", due: "Nov 10", priority: "low" },
+  { task: "Schedule design review with onboarding team", due: "Tomorrow", priority: "high" },
+  { task: "Provide test accounts for payment integration", due: "Friday", priority: "high" },
+  { task: "Move analytics dashboard to phase two backlog", due: "This week", priority: "med" },
+  { task: "Send launch comms draft to marketing", due: "Nov 10", priority: "low" },
 ];
 
 const DECISIONS = [
@@ -38,29 +38,28 @@ const QUIZ = [
   { q: "What is the confirmed product launch date?", a: "November 15th." },
   { q: "Which feature was moved to phase two?", a: "The analytics dashboard." },
   { q: "What does QA need by Friday?", a: "Test accounts for the payment integration." },
-  { q: "Who owns the design review?", a: "Sara." },
+  { q: "What was scheduled for tomorrow?", a: "A design review with the onboarding team." },
 ];
 
 const STATS = [
   { icon: Clock, label: "Duration", value: "24 min" },
-  { icon: Users, label: "Speakers", value: "5" },
+  { icon: FileText, label: "Words", value: "3,840" },
   { icon: ListChecks, label: "Actions", value: "4" },
   { icon: TrendingUp, label: "Confidence", value: "98%" },
 ];
 
 const EMAIL = `Hi team,
 
-Thanks for joining today's Q4 sync. Quick recap:
+Thanks for the Q4 sync today. Quick recap:
 
 • Launch is locked in for November 15th.
 • Onboarding flow is pending engineering sign-off — design review tomorrow.
 • Analytics dashboard moves to phase two.
-• Aisha will share payment test accounts by Friday.
+• Payment integration test accounts to be shared by Friday.
 
-Let me know if I missed anything.
+Let me know if anything was missed.
 
-Best,
-Sara`;
+Best`;
 
 const PRIORITY_STYLES: Record<string, string> = {
   high: "bg-destructive/15 text-destructive border-destructive/30",
@@ -98,7 +97,6 @@ function Results() {
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Q4 Product Roadmap Sync</h1>
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="px-3 py-1 rounded-full bg-gradient-brand-soft text-xs font-semibold text-brand-purple">5 participants</span>
             <span className="px-3 py-1 rounded-full glass text-xs font-medium flex items-center gap-1.5">
               <Languages className="h-3 w-3" /> English
             </span>
@@ -157,7 +155,7 @@ function Results() {
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${done[i] ? "line-through text-muted-foreground" : ""}`}>{a.task}</p>
                       <div className="mt-1 flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-muted-foreground">{a.owner} · due {a.due}</span>
+                        <span className="text-xs text-muted-foreground">due {a.due}</span>
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${PRIORITY_STYLES[a.priority]}`}>
                           {a.priority}
                         </span>
@@ -223,22 +221,17 @@ function Results() {
                 <div className="flex items-center gap-3">
                   <FileText className="h-5 w-5 text-brand-purple" />
                   <span className="font-semibold">Full Transcript</span>
-                  <span className="text-xs text-muted-foreground">· 6 turns</span>
+                  <span className="text-xs text-muted-foreground">· 3,840 words</span>
                 </div>
                 <ChevronDown className={`h-5 w-5 transition-transform ${showTranscript ? "rotate-180" : ""}`} />
               </button>
               {showTranscript && (
                 <div className="px-6 pb-6 text-sm text-muted-foreground leading-relaxed space-y-3 animate-fade-in-up">
-                  {[
-                    ["Sara", "Welcome everyone to today's product sync. Let's start with the Q4 roadmap."],
-                    ["Ali", "Marketing has confirmed the launch window for November 15th, but we still need engineering sign-off on the new onboarding flow."],
-                    ["Sara", "Got it. I'll schedule a review with the design team tomorrow."],
-                    ["Hassan", "Quick note — the analytics dashboard needs another week before it's production ready."],
-                    ["Sara", "Understood, let's move that to phase two. Any blockers from QA?"],
-                    ["Aisha", "We need test accounts for the new payment integration by Friday."],
-                  ].map(([who, text], i) => (
-                    <p key={i}><strong className="text-gradient-brand">{who}:</strong> {text}</p>
-                  ))}
+                  <p>Welcome to today's product sync. Let's start with the Q4 roadmap.</p>
+                  <p>Marketing has confirmed the launch window for November 15th, but we still need engineering sign-off on the new onboarding flow.</p>
+                  <p>We'll schedule a review with the design team tomorrow.</p>
+                  <p>Quick note — the analytics dashboard needs another week before it's production ready, so let's move that to phase two.</p>
+                  <p>From the QA side, we need test accounts for the new payment integration by Friday.</p>
                 </div>
               )}
             </div>
@@ -246,32 +239,6 @@ function Results() {
 
           {/* SIDEBAR */}
           <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-            <div className="gradient-border rounded-2xl p-5">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Users className="h-4 w-4 text-brand-purple" /> Participants
-              </h3>
-              <div className="space-y-3">
-                {[
-                  { n: "Sara", r: "PM", c: "from-brand-blue to-brand-purple", t: "8 min" },
-                  { n: "Ali", r: "Marketing", c: "from-brand-purple to-brand-pink", t: "5 min" },
-                  { n: "Hassan", r: "Engineering", c: "from-brand-pink to-brand-purple", t: "4 min" },
-                  { n: "Aisha", r: "QA Lead", c: "from-brand-blue to-brand-pink", t: "4 min" },
-                  { n: "Omar", r: "Design", c: "from-brand-purple to-brand-blue", t: "3 min" },
-                ].map((p) => (
-                  <div key={p.n} className="flex items-center gap-3">
-                    <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${p.c} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-                      {p.n[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{p.n}</p>
-                      <p className="text-xs text-muted-foreground">{p.r}</p>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{p.t}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <div className="gradient-border rounded-2xl p-5">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-brand-purple" /> Sentiment
