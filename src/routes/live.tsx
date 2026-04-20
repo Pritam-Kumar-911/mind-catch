@@ -101,7 +101,7 @@ function LiveSession() {
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 leading-relaxed text-[15px]">
               {words.map((w, i) => (
                 <span key={i} className="animate-fade-in-up" style={{ animationDuration: "0.4s" }}>
-                  {w.endsWith(":") ? <strong className="text-gradient-brand font-semibold">{w} </strong> : <>{w} </>}
+                  {w}{" "}
                 </span>
               ))}
               {!paused && <span className="inline-block w-2 h-5 bg-brand-purple align-middle animate-pulse" />}
@@ -146,16 +146,16 @@ function LiveSession() {
                 </TabsContent>
                 <TabsContent value="actions" className="mt-0 space-y-2">
                   {[
-                    { t: "Schedule design review with onboarding team", o: "Sara", d: "Tomorrow" },
-                    { t: "Provide test accounts for payment integration", o: "Aisha", d: "Friday" },
-                    { t: "Move analytics dashboard to phase two backlog", o: "Hassan", d: "This week" },
-                    { t: "Send launch comms draft to marketing", o: "Ali", d: "Nov 10" },
+                    { t: "Schedule design review with onboarding team", d: "Tomorrow" },
+                    { t: "Provide test accounts for payment integration", d: "Friday" },
+                    { t: "Move analytics dashboard to phase two backlog", d: "This week" },
+                    { t: "Send launch comms draft to marketing", d: "Nov 10" },
                   ].map((a, i) => (
                     <label key={i} className="flex gap-3 items-start p-3 rounded-lg hover:bg-accent/40 cursor-pointer transition group">
                       <Square className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0 group-hover:text-brand-purple transition" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm">{a.t}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{a.o} · due {a.d}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">due {a.d}</p>
                       </div>
                     </label>
                   ))}
