@@ -1,9 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CheckCircle2, Square, Mic, StopCircle } from "lucide-react";
+import {
+  Square, Mic, StopCircle, Users, Volume2, Pause, Play, Settings,
+  MessageSquare, Sparkles, ListChecks, Target, HelpCircle, Download,
+  Languages, Wifi,
+} from "lucide-react";
 
 export const Route = createFileRoute("/live")({
   head: () => ({
@@ -19,12 +23,22 @@ export const Route = createFileRoute("/live")({
 
 const SCRIPT = `Sara: Welcome everyone to today's product sync. Let's start with the Q4 roadmap. Ali: Marketing has confirmed the launch window for November 15th, but we still need engineering sign-off on the new onboarding flow. Sara: Got it. I'll schedule a review with the design team tomorrow. Hassan: Quick note — the analytics dashboard needs another week before it's production ready. Sara: Understood, let's move that to phase two. Any blockers from QA? Aisha: We need test accounts for the new payment integration by Friday.`.split(" ");
 
+const PARTICIPANTS = [
+  { name: "Sara", color: "from-brand-blue to-brand-purple", speaking: true },
+  { name: "Ali", color: "from-brand-purple to-brand-pink", speaking: false },
+  { name: "Hassan", color: "from-brand-pink to-brand-purple", speaking: false },
+  { name: "Aisha", color: "from-brand-blue to-brand-pink", speaking: false },
+];
+
 function LiveSession() {
   const [words, setWords] = useState<string[]>([]);
   const [seconds, setSeconds] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let i = 0;
+    if (paused) return;
+    let i = words.length;
     const id = setInterval(() => {
       if (i < SCRIPT.length) {
         setWords((w) => [...w, SCRIPT[i]]);
@@ -33,7 +47,11 @@ function LiveSession() {
     }, 220);
     const t = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => { clearInterval(id); clearInterval(t); };
-  }, []);
+  }, [paused]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [words]);
 
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
@@ -43,82 +61,157 @@ function LiveSession() {
       <Navbar />
 
       {/* Recording bar */}
-      <div className="sticky top-16 z-40 glass border-b border-border/60">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div className="sticky top-16 z-40 glass-strong border-b border-border/60">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <span className="h-3 w-3 rounded-full bg-destructive animate-pulse-dot" />
-            <span className="font-semibold text-destructive">Recording...</span>
-            <span className="hidden sm:inline text-sm text-muted-foreground font-mono">{mm}:{ss}</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-destructive/15 border border-destructive/30">
+              <span className="h-2.5 w-2.5 rounded-full bg-destructive animate-pulse-dot" />
+              <span className="font-semibold text-destructive text-sm">RECORDING</span>
+            </div>
+            <span className="text-sm text-muted-foreground font-mono tabular-nums">{mm}:{ss}</span>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Wifi className="h-3.5 w-3.5 text-green-500" /> Connection strong
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Mic className="h-4 w-4 text-brand-purple" />
-            <span className="hidden sm:inline">Mic active · Auto-captioning</span>
+          <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-1 px-3 py-1.5 rounded-lg glass text-xs">
+              <Languages className="h-3.5 w-3.5 text-brand-purple" />
+              <span>EN · UR</span>
+            </div>
+            <Button variant="glass" size="sm" onClick={() => setPaused(!paused)}>
+              {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+              {paused ? "Resume" : "Pause"}
+            </Button>
+            <Button variant="ghost" size="icon"><Settings className="h-4 w-4" /></Button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 mx-auto max-w-7xl w-full px-4 sm:px-6 py-6">
-        <div className="grid lg:grid-cols-2 gap-6 h-[calc(100vh-220px)] min-h-[500px]">
-          {/* Transcript */}
-          <div className="glass rounded-2xl flex flex-col overflow-hidden">
+      <div className="flex-1 mx-auto max-w-[1400px] w-full px-4 sm:px-6 py-6">
+        {/* Participants strip */}
+        <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">{PARTICIPANTS.length} participants</span>
+          </div>
+          <div className="flex -space-x-2">
+            {PARTICIPANTS.map((p) => (
+              <div key={p.name} className="relative">
+                <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${p.color} flex items-center justify-center text-white text-xs font-bold ring-2 ring-background`}>
+                  {p.name[0]}
+                </div>
+                {p.speaking && (
+                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-background animate-pulse" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-[1.3fr_1fr] gap-5 h-[calc(100vh-260px)] min-h-[520px]">
+          {/* TRANSCRIPT */}
+          <div className="gradient-border rounded-2xl flex flex-col overflow-hidden">
             <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
-              <h2 className="font-semibold">Live Transcript</h2>
-              <span className="text-xs text-muted-foreground">{words.length} words</span>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-brand-purple" />
+                <h2 className="font-semibold">Live Transcript</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-0.5 items-end h-3">
+                  {[0.4, 0.7, 1, 0.6, 0.8, 0.5].map((h, i) => (
+                    <span key={i} className={`w-0.5 bg-brand-purple rounded-full ${paused ? "" : "animate-wave"}`} style={{ height: `${h * 100}%`, animationDelay: `${i * 0.12}s` }} />
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">{words.length} words</span>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 leading-relaxed text-[15px]">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 leading-relaxed text-[15px]">
               {words.map((w, i) => (
                 <span key={i} className="animate-fade-in-up" style={{ animationDuration: "0.4s" }}>
-                  {w.endsWith(":") ? <strong className="text-gradient-brand">{w} </strong> : <>{w} </>}
+                  {w.endsWith(":") ? <strong className="text-gradient-brand font-semibold">{w} </strong> : <>{w} </>}
                 </span>
               ))}
-              <span className="inline-block w-2 h-5 bg-brand-purple align-middle animate-pulse" />
+              {!paused && <span className="inline-block w-2 h-5 bg-brand-purple align-middle animate-pulse" />}
+            </div>
+            <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Volume2 className="h-3.5 w-3.5 text-brand-purple" />
+                Auto-detecting language
+              </div>
+              <button className="flex items-center gap-1 hover:text-foreground transition">
+                <Download className="h-3.5 w-3.5" /> Save .txt
+              </button>
             </div>
           </div>
 
-          {/* AI Notes */}
-          <div className="glass rounded-2xl flex flex-col overflow-hidden">
+          {/* AI NOTES */}
+          <div className="gradient-border rounded-2xl flex flex-col overflow-hidden">
             <Tabs defaultValue="summary" className="flex flex-col h-full">
               <div className="px-5 py-4 border-b border-border/60">
-                <h2 className="font-semibold mb-3">AI Notes</h2>
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-brand-purple" />
+                  <h2 className="font-semibold">AI Notes</h2>
+                  <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gradient-brand text-white">LIVE</span>
+                </div>
                 <TabsList className="grid grid-cols-4 w-full">
-                  <TabsTrigger value="summary">Summary</TabsTrigger>
-                  <TabsTrigger value="actions">Actions</TabsTrigger>
-                  <TabsTrigger value="key">Key Points</TabsTrigger>
-                  <TabsTrigger value="quiz">Quiz</TabsTrigger>
+                  <TabsTrigger value="summary" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /><span className="hidden sm:inline">Summary</span></TabsTrigger>
+                  <TabsTrigger value="actions" className="gap-1.5"><ListChecks className="h-3.5 w-3.5" /><span className="hidden sm:inline">Actions</span></TabsTrigger>
+                  <TabsTrigger value="key" className="gap-1.5"><Target className="h-3.5 w-3.5" /><span className="hidden sm:inline">Key</span></TabsTrigger>
+                  <TabsTrigger value="quiz" className="gap-1.5"><HelpCircle className="h-3.5 w-3.5" /><span className="hidden sm:inline">Quiz</span></TabsTrigger>
                 </TabsList>
               </div>
               <div className="flex-1 overflow-y-auto p-5">
-                <TabsContent value="summary" className="mt-0 space-y-3 text-sm leading-relaxed text-muted-foreground">
-                  <p>The team aligned on a Q4 roadmap with a confirmed launch on <span className="text-foreground font-medium">November 15th</span>.</p>
-                  <p>Engineering still needs to sign off on the onboarding flow, and the analytics dashboard has been moved to phase two.</p>
+                <TabsContent value="summary" className="mt-0 space-y-4 text-sm">
+                  <div className="rounded-xl bg-gradient-brand-soft p-4 border border-border/40">
+                    <p className="text-[10px] font-bold text-brand-purple uppercase tracking-wider mb-2">Executive Summary</p>
+                    <p className="leading-relaxed">The team aligned on a Q4 roadmap with a confirmed launch on <span className="font-semibold">November 15th</span>.</p>
+                  </div>
+                  <div className="rounded-xl bg-accent/30 p-4">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Context</p>
+                    <p className="text-muted-foreground leading-relaxed">Engineering still needs to sign off on the onboarding flow, and the analytics dashboard has been moved to phase two.</p>
+                  </div>
                 </TabsContent>
-                <TabsContent value="actions" className="mt-0 space-y-3">
+                <TabsContent value="actions" className="mt-0 space-y-2">
                   {[
-                    "Schedule design review with onboarding team",
-                    "Provide test accounts for payment integration by Friday",
-                    "Move analytics dashboard to phase two backlog",
-                    "Send launch comms draft to marketing",
+                    { t: "Schedule design review with onboarding team", o: "Sara", d: "Tomorrow" },
+                    { t: "Provide test accounts for payment integration", o: "Aisha", d: "Friday" },
+                    { t: "Move analytics dashboard to phase two backlog", o: "Hassan", d: "This week" },
+                    { t: "Send launch comms draft to marketing", o: "Ali", d: "Nov 10" },
                   ].map((a, i) => (
-                    <label key={i} className="flex gap-3 items-start p-3 rounded-lg hover:bg-accent/40 cursor-pointer transition">
-                      <Square className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                      <span className="text-sm">{a}</span>
+                    <label key={i} className="flex gap-3 items-start p-3 rounded-lg hover:bg-accent/40 cursor-pointer transition group">
+                      <Square className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0 group-hover:text-brand-purple transition" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm">{a.t}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{a.o} · due {a.d}</p>
+                      </div>
                     </label>
                   ))}
                 </TabsContent>
                 <TabsContent value="key" className="mt-0 space-y-2 text-sm">
-                  {["Launch confirmed for Nov 15", "Analytics deferred to phase 2", "QA needs payment test accounts", "Design review tomorrow"].map((k, i) => (
-                    <div key={i} className="flex gap-2"><span className="text-brand-purple">▸</span><span>{k}</span></div>
+                  {[
+                    "Launch confirmed for November 15",
+                    "Analytics deferred to phase 2",
+                    "QA needs payment test accounts by Friday",
+                    "Design review scheduled for tomorrow",
+                  ].map((k, i) => (
+                    <div key={i} className="flex gap-3 p-3 rounded-lg bg-accent/30">
+                      <span className="text-brand-purple font-bold">{String(i + 1).padStart(2, "0")}</span>
+                      <span>{k}</span>
+                    </div>
                   ))}
                 </TabsContent>
-                <TabsContent value="quiz" className="mt-0 space-y-3">
+                <TabsContent value="quiz" className="mt-0 space-y-2">
                   {[
                     { q: "What is the confirmed launch date?", a: "November 15th" },
                     { q: "Which feature was moved to phase two?", a: "The analytics dashboard" },
                     { q: "What does QA need by Friday?", a: "Test accounts for the payment integration" },
                   ].map((qa, i) => (
-                    <details key={i} className="group rounded-lg bg-accent/30 p-3">
-                      <summary className="cursor-pointer text-sm font-medium">Q{i + 1}. {qa.q}</summary>
-                      <p className="mt-2 text-sm text-muted-foreground">{qa.a}</p>
+                    <details key={i} className="group rounded-lg bg-accent/30 hover:bg-accent/50 p-4 transition">
+                      <summary className="cursor-pointer text-sm font-medium list-none flex items-start gap-2">
+                        <span className="text-brand-purple shrink-0">Q{i + 1}.</span>
+                        <span>{qa.q}</span>
+                      </summary>
+                      <p className="mt-3 text-sm text-muted-foreground pl-7">{qa.a}</p>
                     </details>
                   ))}
                 </TabsContent>
@@ -127,13 +220,20 @@ function LiveSession() {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-center">
-          <Button asChild variant="destructive" size="xl">
-            <Link to="/results">
-              <StopCircle className="h-5 w-5" />
-              End Session
-            </Link>
-          </Button>
+        {/* Bottom action bar */}
+        <div className="mt-6 glass-strong rounded-2xl p-3 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground px-2">
+            <Mic className="h-4 w-4 text-brand-purple" />
+            Mic active · Auto-captioning enabled
+          </div>
+          <div className="flex gap-2 ml-auto">
+            <Button variant="glass" size="lg"><Pause className="h-4 w-4" /> Pause</Button>
+            <Button asChild variant="destructive" size="lg" className="shadow-glow">
+              <Link to="/results">
+                <StopCircle className="h-5 w-5" /> End Session
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     </div>
