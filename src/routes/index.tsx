@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MeetMind — Never Miss a Word Again" },
+      { title: "MeetMind — Turn Conversations Into Clarity" },
       { name: "description", content: "AI-powered meeting notes, summaries and action items generated in real time." },
-      { property: "og:title", content: "MeetMind — Never Miss a Word Again" },
+      { property: "og:title", content: "MeetMind — Turn Conversations Into Clarity" },
       { property: "og:description", content: "AI-powered meeting notes, summaries and action items generated in real time." },
     ],
   }),
