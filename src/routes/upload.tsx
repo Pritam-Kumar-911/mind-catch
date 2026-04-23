@@ -1,5 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
+import { analyzeAudio, mapLanguage } from "@/api";
+import { useNavigate } from "@tanstack/react-router";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,11 +36,14 @@ const PERKS = [
 ];
 
 function UploadPage() {
+  // ── All state & logic BEFORE the return ──────────────────────────────────
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [language, setLanguage] = useState("english");
   const [dragging, setDragging] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const handleFile = (f: File | null) => {
     if (!f) return;
@@ -52,6 +57,21 @@ function UploadPage() {
     }, 180);
   };
 
+  const handleAnalyze = async () => {
+    if (!file) return;
+    setAnalyzing(true);
+    try {
+      const results = await analyzeAudio(file, mapLanguage(language));
+      sessionStorage.setItem("meetingResults", JSON.stringify(results));
+      navigate({ to: "/results" });
+    } catch (error: any) {
+      alert("Error analyzing audio: " + error.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // ── JSX starts here ───────────────────────────────────────────────────────
   return (
     <div className="min-h-screen relative">
       <Navbar />
@@ -111,7 +131,6 @@ function UploadPage() {
             </div>
             <p className="font-bold text-xl sm:text-2xl">Drag & drop your file here</p>
             <p className="mt-2 text-sm text-muted-foreground">or click to browse · max 500MB</p>
-
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {FORMATS.map((f) => (
                 <div key={f.ext} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full glass text-xs font-semibold">
@@ -175,11 +194,18 @@ function UploadPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button asChild variant="brand" size="xl" disabled={!file || progress < 100} className="w-full sm:w-auto shadow-glow">
-              <Link to="/results">
-                <Sparkles className="h-5 w-5" />
-                Analyze Meeting
-              </Link>
+            <Button
+              variant="brand"
+              size="xl"
+              disabled={!file || progress < 100 || analyzing}
+              className="w-full sm:w-auto shadow-glow"
+              onClick={handleAnalyze}
+            >
+              {analyzing ? (
+                <><span className="animate-spin mr-2">⏳</span> Analyzing...</>
+              ) : (
+                <><Sparkles className="h-5 w-5" /> Analyze Meeting</>
+              )}
             </Button>
           </div>
         </div>

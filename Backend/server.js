@@ -5,9 +5,12 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { exec } from "child_process";
+import { promisify } from "util";
 import speech from "@google-cloud/speech";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+const execAsync = promisify(exec);
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,26 +19,71 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ─── Clients ────────────────────────────────────────────────────────────────
+// ─── Clients ──────────────────────────────────────────────────────────────────
 const speechClient = new speech.SpeechClient();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
 
-// ─── Middleware ──────────────────────────────────────────────────────────────
+// ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 
-// Store uploads in /backend/uploads
-const upload = multer({ dest: path.join(__dirname, "uploads/") });
+const upload = multer({
+  dest: path.join(__dirname, "uploads/"),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+});
 
-// ─── Health Check ────────────────────────────────────────────────────────────
+// ─── Helper: cleanup files ────────────────────────────────────────────────────
+function cleanup(...files) {
+  for (const f of files) {
+    try {
+      if (f && fs.existsSync(f)) fs.unlinkSync(f);
+    } catch {}
+  }
+}
+
+// ─── Gemini prompt helper ─────────────────────────────────────────────────────
+function buildGeminiPrompt(transcript, full = true) {
+  if (!full) {
+    return `
+You are a real-time meeting assistant. Based on this partial transcript, give a quick update.
+PARTIAL TRANSCRIPT: """${transcript}"""
+Return ONLY valid JSON (no markdown):
+{
+  "summary": "1-2 sentence summary so far",
+  "actionItems": [{ "task": "task", "owner": "owner", "due": "due" }],
+  "keyPoints": ["point 1", "point 2"]
+}`;
+  }
+
+  return `
+You are MeetMind, an AI meeting assistant. Analyze this transcript and return JSON.
+TRANSCRIPT: """${transcript}"""
+Return ONLY a valid JSON object (no markdown, no backticks):
+{
+  "summary": "3-4 sentence executive summary",
+  "actionItems": [{ "task": "task description", "owner": "person name or Team", "due": "deadline or Soon" }],
+  "keyDecisions": ["decision 1", "decision 2"],
+  "keyPoints": ["key point 1", "key point 2"],
+  "quiz": [{ "question": "question text", "answer": "answer text" }],
+  "emailDraft": "Professional follow-up email draft"
+}
+Rules:
+- Extract real action items with owners if mentioned
+- Create 3-5 quiz questions
+- Write a complete professional email
+- Return ONLY the JSON`;
+}
+
+// ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({ status: "MeetMind backend is running 🚀" });
 });
 
-// ─── ROUTE 1: Upload audio → Transcript + AI Results ────────────────────────
+// ─── ROUTE 1: Upload any audio/video → Full AI analysis ──────────────────────
 app.post("/api/analyze", upload.single("audio"), async (req, res) => {
   const filePath = req.file?.path;
+  const wavPath = filePath ? filePath + ".wav" : null;
 
   try {
     if (!req.file) {
@@ -43,31 +91,54 @@ app.post("/api/analyze", upload.single("audio"), async (req, res) => {
     }
 
     const language = req.body.language || "en-US";
-
-    console.log(`📁 File received: ${req.file.originalname}`);
+    console.log(`\n📁 File received: ${req.file.originalname}`);
+    console.log(`📦 Size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
     console.log(`🌐 Language: ${language}`);
 
-    // ── Step 1: Read audio file ──────────────────────────────────────────────
-    const audioBytes = fs.readFileSync(filePath).toString("base64");
+    // ── Step 1: Convert to WAV with ffmpeg ────────────────────────────────────
+    console.log("🎬 Converting to WAV with ffmpeg...");
+    try {
+      await execAsync(`ffmpeg -i "${filePath}" -ar 16000 -ac 1 -f wav "${wavPath}" -y`);
+      console.log("✅ Conversion complete!");
+    } catch (err) {
+      console.error("❌ ffmpeg failed:", err.message);
+      return res.status(422).json({
+        error: "Could not process file. Make sure it's a valid audio or video file.",
+      });
+    }
 
-    // ── Step 2: Send to Google Speech-to-Text ───────────────────────────────
+    // ── Step 2: Check WAV file size (Speech-to-Text limit is ~10MB) ───────────
+    const wavSize = fs.statSync(wavPath).size;
+    console.log(`📊 WAV size: ${(wavSize / 1024 / 1024).toFixed(2)} MB`);
+
+    if (wavSize > 10 * 1024 * 1024) {
+      console.log("⚠️ File too large for inline, would need GCS. Trimming to first 60s...");
+      const trimmedPath = filePath + "_trimmed.wav";
+      await execAsync(`ffmpeg -i "${wavPath}" -t 60 "${trimmedPath}" -y`);
+      cleanup(wavPath);
+      fs.renameSync(trimmedPath, wavPath);
+      console.log("✅ Trimmed to 60 seconds");
+    }
+
+    // ── Step 3: Send to Google Speech-to-Text ────────────────────────────────
     console.log("🎙️ Sending to Speech-to-Text...");
+    const audioBytes = fs.readFileSync(wavPath).toString("base64");
 
-    const speechRequest = {
+    const [speechResponse] = await speechClient.recognize({
       audio: { content: audioBytes },
       config: {
-        encoding: "MP3",
-        sampleRateHertz: 16000,
-        languageCode: language === "ur-PK" ? "ur-PK" : "en-US",
-        alternativeLanguageCodes: language === "both" ? ["ur-PK", "en-US"] : [],
-        enableAutomaticPunctuation: true,
-        enableSpeakerDiarization: true,
-        diarizationSpeakerCount: 3,
-        model: "latest_long",
-      },
-    };
-
-    const [speechResponse] = await speechClient.recognize(speechRequest);
+  encoding: "LINEAR16",
+  sampleRateHertz: 16000,
+  languageCode: language === "ur-PK" ? "ur-PK" : "en-US",
+  alternativeLanguageCodes: language === "both" ? ["ur-PK", "en-US"] : [],
+  enableAutomaticPunctuation: true,
+  ...(language !== "ur-PK" && {
+    enableSpeakerDiarization: true,
+    diarizationSpeakerCount: 3,
+    model: "latest_long",
+  }),
+},
+    });
 
     const transcript = speechResponse.results
       .map((r) => r.alternatives[0]?.transcript || "")
@@ -76,67 +147,29 @@ app.post("/api/analyze", upload.single("audio"), async (req, res) => {
 
     if (!transcript) {
       return res.status(422).json({
-        error: "Could not transcribe audio. Please check the file format.",
+        error: "No speech detected. Make sure the audio has clear speech and try again.",
       });
     }
 
-    console.log(`✅ Transcript ready (${transcript.split(" ").length} words)`);
+    console.log(`✅ Transcript ready: "${transcript.substring(0, 80)}..."`);
+    console.log(`📝 Word count: ${transcript.split(" ").length}`);
 
-    // ── Step 3: Send transcript to Gemini ───────────────────────────────────
-    console.log("🧠 Sending to Gemini for analysis...");
-
-    const geminiPrompt = `
-You are MeetMind, an AI meeting assistant. Analyze this meeting transcript and return a JSON response.
-
-TRANSCRIPT:
-"""
-${transcript}
-"""
-
-Return ONLY a valid JSON object with this exact structure (no markdown, no backticks):
-{
-  "summary": "3-4 sentence executive summary of the meeting",
-  "actionItems": [
-    { "task": "task description", "owner": "person name or Team", "due": "deadline or Soon" }
-  ],
-  "keyDecisions": [
-    "decision 1",
-    "decision 2"
-  ],
-  "keyPoints": [
-    "key point 1",
-    "key point 2"
-  ],
-  "quiz": [
-    { "question": "question text", "answer": "answer text" }
-  ],
-  "emailDraft": "Professional follow-up email draft based on the meeting"
-}
-
-Rules:
-- actionItems: extract real tasks with owners if mentioned
-- quiz: create 3-5 questions based on key content
-- emailDraft: write a complete professional email
-- If something is not clear, make a reasonable inference
-- Return ONLY the JSON, nothing else
-`;
-
-    const geminiResult = await geminiModel.generateContent(geminiPrompt);
+    // ── Step 4: Send to Gemini ────────────────────────────────────────────────
+    console.log("🧠 Sending to Gemini...");
+    const geminiResult = await geminiModel.generateContent(buildGeminiPrompt(transcript));
     const geminiText = geminiResult.response.text();
 
-    // ── Step 4: Parse Gemini response ───────────────────────────────────────
     let aiResults;
     try {
       const cleaned = geminiText.replace(/```json|```/g, "").trim();
       aiResults = JSON.parse(cleaned);
     } catch {
-      console.error("❌ Failed to parse Gemini JSON:", geminiText);
+      console.error("❌ Gemini JSON parse failed:", geminiText.substring(0, 200));
       return res.status(500).json({ error: "Failed to parse AI response" });
     }
 
-    console.log("✅ AI analysis complete!");
+    console.log("✅ AI analysis complete!\n");
 
-    // ── Step 5: Return everything ────────────────────────────────────────────
     res.json({
       success: true,
       transcript,
@@ -146,134 +179,95 @@ Rules:
     });
 
   } catch (error) {
-    console.error("❌ Error:", error.message);
+    console.error("❌ Unexpected error:", error.message);
     res.status(500).json({ error: error.message });
   } finally {
-    // Clean up uploaded file
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    cleanup(filePath, wavPath);
   }
 });
 
-// ─── ROUTE 2: Analyze plain text transcript ──────────────────────────────────
+// ─── ROUTE 2: Analyze plain text transcript ───────────────────────────────────
 app.post("/api/analyze-text", async (req, res) => {
   const { transcript } = req.body;
-
-  if (!transcript) {
-    return res.status(400).json({ error: "No transcript provided" });
-  }
+  if (!transcript) return res.status(400).json({ error: "No transcript provided" });
 
   try {
-    console.log("🧠 Analyzing text transcript with Gemini...");
-
-    const geminiPrompt = `
-You are MeetMind, an AI meeting assistant. Analyze this meeting transcript and return a JSON response.
-
-TRANSCRIPT:
-"""
-${transcript}
-"""
-
-Return ONLY a valid JSON object with this exact structure (no markdown, no backticks):
-{
-  "summary": "3-4 sentence executive summary of the meeting",
-  "actionItems": [
-    { "task": "task description", "owner": "person name or Team", "due": "deadline or Soon" }
-  ],
-  "keyDecisions": [
-    "decision 1",
-    "decision 2"
-  ],
-  "keyPoints": [
-    "key point 1",
-    "key point 2"
-  ],
-  "quiz": [
-    { "question": "question text", "answer": "answer text" }
-  ],
-  "emailDraft": "Professional follow-up email draft based on the meeting"
-}
-
-Rules:
-- actionItems: extract real tasks with owners if mentioned
-- quiz: create 3-5 questions based on key content  
-- emailDraft: write a complete professional email
-- Return ONLY the JSON, nothing else
-`;
-
-    const geminiResult = await geminiModel.generateContent(geminiPrompt);
-    const geminiText = geminiResult.response.text();
-
-    let aiResults;
-    try {
-      const cleaned = geminiText.replace(/```json|```/g, "").trim();
-      aiResults = JSON.parse(cleaned);
-    } catch {
-      return res.status(500).json({ error: "Failed to parse AI response" });
-    }
-
+    console.log("🧠 Analyzing text with Gemini...");
+    const geminiResult = await geminiModel.generateContent(buildGeminiPrompt(transcript));
+    const cleaned = geminiResult.response.text().replace(/```json|```/g, "").trim();
+    const aiResults = JSON.parse(cleaned);
     console.log("✅ Text analysis complete!");
-
-    res.json({
-      success: true,
-      transcript,
-      wordCount: transcript.split(" ").length,
-      ...aiResults,
-    });
-
+    res.json({ success: true, transcript, wordCount: transcript.split(" ").length, ...aiResults });
   } catch (error) {
     console.error("❌ Error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// ─── ROUTE 3: Live transcript chunk → Quick AI update ───────────────────────
+// ─── ROUTE 3: Live session update ─────────────────────────────────────────────
 app.post("/api/live-update", async (req, res) => {
   const { transcript } = req.body;
-
-  if (!transcript) {
-    return res.status(400).json({ error: "No transcript provided" });
-  }
+  if (!transcript) return res.status(400).json({ error: "No transcript provided" });
 
   try {
-    const geminiPrompt = `
-You are a real-time meeting assistant. Based on this partial transcript, give a quick update.
-
-PARTIAL TRANSCRIPT:
-"""
-${transcript}
-"""
-
-Return ONLY a valid JSON object (no markdown):
-{
-  "summary": "1-2 sentence summary so far",
-  "actionItems": [
-    { "task": "task", "owner": "owner", "due": "due" }
-  ],
-  "keyPoints": ["point 1", "point 2"]
-}
-`;
-
-    const geminiResult = await geminiModel.generateContent(geminiPrompt);
-    const geminiText = geminiResult.response.text();
-
-    const cleaned = geminiText.replace(/```json|```/g, "").trim();
+    const geminiResult = await geminiModel.generateContent(buildGeminiPrompt(transcript, false));
+    const cleaned = geminiResult.response.text().replace(/```json|```/g, "").trim();
     const aiResults = JSON.parse(cleaned);
-
     res.json({ success: true, ...aiResults });
-
   } catch (error) {
     console.error("❌ Live update error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
+// ─── ROUTE 4: Live audio chunk → quick transcript ────────────────────────────
+app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
+  const filePath = req.file?.path;
+  const wavPath = filePath + ".wav";
 
-// ─── Start Server ─────────────────────────────────────────────────────────────
+  try {
+    if (!req.file) return res.status(400).json({ error: "No chunk" });
+
+    // Convert webm chunk to WAV
+    await execAsync(`ffmpeg -y -f webm -i "${filePath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${wavPath}" 2>/dev/null || ffmpeg -y -f matroska -i "${filePath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${wavPath}"`);
+
+    
+
+    const audioBytes = fs.readFileSync(wavPath).toString("base64");
+
+    const [speechResponse] = await speechClient.recognize({
+      audio: { content: audioBytes },
+      config: {
+        encoding: "LINEAR16",
+        sampleRateHertz: 16000,
+        languageCode: "en-US",
+        enableAutomaticPunctuation: true,
+        model: "latest_short", // fastest model for short chunks
+      },
+    });
+
+    const transcript = speechResponse.results
+      .map((r) => r.alternatives[0]?.transcript || "")
+      .join(" ")
+      .trim();
+
+      console.log(`🎬 Chunk transcript: "${transcript}" (${speechResponse.results.length} results)`);
+
+    res.json({ success: true, transcript });
+
+  } catch (error) {
+    // Don't crash on empty chunks — just return empty
+    res.json({ success: true, transcript: "" });
+  } finally {
+    cleanup(filePath, wavPath);
+  }
+});
+
+
+// ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 MeetMind backend running on http://localhost:${PORT}`);
-  console.log(`📡 Routes ready:`);
-  console.log(`   POST /api/analyze       → Upload audio file`);
+  console.log(`📡 Routes:`);
+  console.log(`   POST /api/analyze       → Upload audio/video file`);
   console.log(`   POST /api/analyze-text  → Analyze text transcript`);
   console.log(`   POST /api/live-update   → Live session AI updates\n`);
 });
