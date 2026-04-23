@@ -25,6 +25,7 @@ export const Route = createFileRoute("/live")({
 });
 
 type CaptureMode = "idle" | "mic" | "tab";
+type TabLanguage = "en-US" | "ur-PK" | "both";
 
 interface SubtitleLine {
   id: number;
@@ -36,6 +37,7 @@ function LiveSession() {
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<CaptureMode>("idle");
+  const [tabLanguage, setTabLanguage] = useState<TabLanguage>("en-US");
   const [paused, setPaused] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [transcript, setTranscript] = useState("");
@@ -58,10 +60,12 @@ function LiveSession() {
   const transcriptRef = useRef("");
   const pausedRef = useRef(false);
   const modeRef = useRef<CaptureMode>("idle");
+  const tabLanguageRef = useRef<TabLanguage>("en-US");
 
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
   useEffect(() => { pausedRef.current = paused; }, [paused]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { tabLanguageRef.current = tabLanguage; }, [tabLanguage]);
 
   // ── Timer ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -236,6 +240,7 @@ function LiveSession() {
           if (blob.size > 5000 && !pausedRef.current) {
             const formData = new FormData();
             formData.append("chunk", blob, "audio.webm");
+            formData.append("language", tabLanguageRef.current);
 
             try {
               const res = await fetch("http://localhost:3001/api/transcribe-chunk", {
@@ -443,10 +448,51 @@ function LiveSession() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-1 px-3 py-1.5 rounded-lg glass text-xs">
-              <Languages className="h-3.5 w-3.5 text-brand-purple" />
-              <span>EN</span>
-            </div>
+            {mode === "tab" ? (
+              <div className="flex items-center gap-2 px-2 py-1 rounded-lg glass text-xs">
+                <Languages className="h-3.5 w-3.5 text-brand-purple" />
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setTabLanguage("en-US")}
+                    className={`px-2 py-1 rounded-md transition ${
+                      tabLanguage === "en-US"
+                        ? "bg-brand-purple text-white"
+                        : "hover:bg-accent/50 text-muted-foreground"
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTabLanguage("ur-PK")}
+                    className={`px-2 py-1 rounded-md transition ${
+                      tabLanguage === "ur-PK"
+                        ? "bg-brand-purple text-white"
+                        : "hover:bg-accent/50 text-muted-foreground"
+                    }`}
+                  >
+                    Urdu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTabLanguage("both")}
+                    className={`px-2 py-1 rounded-md transition ${
+                      tabLanguage === "both"
+                        ? "bg-brand-purple text-white"
+                        : "hover:bg-accent/50 text-muted-foreground"
+                    }`}
+                  >
+                    Mixed
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg glass text-xs">
+                <Languages className="h-3.5 w-3.5 text-brand-purple" />
+                <span>English</span>
+              </div>
+            )}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass text-xs">
               <Sparkles className={`h-3.5 w-3.5 ${aiUpdating ? "text-yellow-500 animate-pulse" : "text-brand-purple"}`} />
               <span>{aiUpdating ? "AI updating..." : `AI in ${nextUpdateIn}s`}</span>

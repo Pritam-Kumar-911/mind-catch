@@ -60,6 +60,22 @@ async function callGemini(prompt, retries = 3) {
   }
 }
 
+async function toUrduScript(text) {
+  if (!text?.trim()) return text;
+  const prompt = `
+Convert the following transcript into proper Urdu script.
+Rules:
+- Return ONLY Urdu script text
+- Do not add explanations
+- Do not keep Roman Urdu
+- Convert any Latin/English-script words phonetically into Urdu script where possible
+- Keep meaning the same and keep punctuation natural
+Text: """${text}"""`;
+
+  const converted = await callGemini(prompt, 2);
+  return converted.trim();
+}
+
 // ─── Gemini prompt helper ─────────────────────────────────────────────────────
 function buildGeminiPrompt(transcript, full = true) {
   if (!full) {
@@ -264,15 +280,27 @@ app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
 
     const audioBytes = fs.readFileSync(wavPath).toString("base64");
 
+    const requestedLanguage = req.body?.language || "en-US";
+    console.log(`🌐 Chunk language requested: ${requestedLanguage}`);
+    const languageConfig =
+      requestedLanguage === "both"
+        ? {
+            languageCode: "ur-PK",
+            alternativeLanguageCodes: ["en-US"],
+          }
+        : requestedLanguage === "ur-PK"
+          ? { languageCode: "ur-PK" }
+          : { languageCode: "en-US" };
+    const modelConfig = requestedLanguage === "en-US" ? { model: "latest_long" } : {};
+
     const [speechResponse] = await speechClient.recognize({
       audio: { content: audioBytes },
       config: {
         encoding: "LINEAR16",
         sampleRateHertz: 16000,
-        languageCode: "en-US",
+        ...languageConfig,
         enableAutomaticPunctuation: true,
-        useEnhanced: true,
-        model: "phone_call",
+        ...modelConfig,
       },
     });
 
@@ -281,10 +309,26 @@ app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
       .join(" ")
       .trim();
 
+    console.log(`📝 Raw transcript sample: "${transcript.slice(0, 80)}"`);
+    let finalTranscript = transcript;
+    if (requestedLanguage === "ur-PK" && transcript) {
+      try {
+        finalTranscript = await toUrduScript(transcript);
+      } catch (err) {
+        // Never fail live chunk transcription because transliteration hit quota/rate limits.
+        // Raw STT output for ur-PK is already in Urdu script in most cases.
+        console.warn("⚠️ Urdu script conversion skipped:", err.message);
+        finalTranscript = transcript;
+      }
+    }
+    if (requestedLanguage === "ur-PK") {
+      console.log(`🔁 Urdu script sample: "${finalTranscript.slice(0, 80)}"`);
+    }
+
     console.log(
-      `🎬 Chunk transcript length: ${transcript.length} chars · ${Date.now() - startedAt}ms`
+      `🎬 Chunk transcript length: ${finalTranscript.length} chars · ${Date.now() - startedAt}ms`
     );
-    res.json({ success: true, transcript });
+    res.json({ success: true, transcript: finalTranscript });
 
   } catch (error) {
     console.error(`❌ Chunk error after ${Date.now() - startedAt}ms:`, error.message);
