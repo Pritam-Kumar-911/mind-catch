@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 3001;
 // ─── Clients ──────────────────────────────────────────────────────────────────
 const speechClient = new speech.SpeechClient();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
@@ -30,7 +30,7 @@ app.use(express.json());
 
 const upload = multer({
   dest: path.join(__dirname, "uploads/"),
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
 
 // ─── Helper: cleanup files ────────────────────────────────────────────────────
@@ -39,6 +39,24 @@ function cleanup(...files) {
     try {
       if (f && fs.existsSync(f)) fs.unlinkSync(f);
     } catch {}
+  }
+}
+
+// ─── Helper: call Gemini with auto retry on 429 ───────────────────────────────
+async function callGemini(prompt, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await geminiModel.generateContent(prompt);
+      return result.response.text();
+    } catch (err) {
+      if (err.message.includes("429") && i < retries - 1) {
+        const wait = (i + 1) * 10000; // 10s, 20s, 30s
+        console.log(`⏳ Rate limited. Retrying in ${wait / 1000}s...`);
+        await new Promise((r) => setTimeout(r, wait));
+      } else {
+        throw err;
+      }
+    }
   }
 }
 
@@ -95,7 +113,7 @@ app.post("/api/analyze", upload.single("audio"), async (req, res) => {
     console.log(`📦 Size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
     console.log(`🌐 Language: ${language}`);
 
-    // ── Step 1: Convert to WAV with ffmpeg ────────────────────────────────────
+    // ── Step 1: Convert to WAV ────────────────────────────────────────────────
     console.log("🎬 Converting to WAV with ffmpeg...");
     try {
       await execAsync(`ffmpeg -i "${filePath}" -ar 16000 -ac 1 -f wav "${wavPath}" -y`);
@@ -107,12 +125,12 @@ app.post("/api/analyze", upload.single("audio"), async (req, res) => {
       });
     }
 
-    // ── Step 2: Check WAV file size (Speech-to-Text limit is ~10MB) ───────────
+    // ── Step 2: Check WAV size ────────────────────────────────────────────────
     const wavSize = fs.statSync(wavPath).size;
     console.log(`📊 WAV size: ${(wavSize / 1024 / 1024).toFixed(2)} MB`);
 
     if (wavSize > 10 * 1024 * 1024) {
-      console.log("⚠️ File too large for inline, would need GCS. Trimming to first 60s...");
+      console.log("⚠️ File too large, trimming to 60s...");
       const trimmedPath = filePath + "_trimmed.wav";
       await execAsync(`ffmpeg -i "${wavPath}" -t 60 "${trimmedPath}" -y`);
       cleanup(wavPath);
@@ -120,24 +138,24 @@ app.post("/api/analyze", upload.single("audio"), async (req, res) => {
       console.log("✅ Trimmed to 60 seconds");
     }
 
-    // ── Step 3: Send to Google Speech-to-Text ────────────────────────────────
+    // ── Step 3: Speech-to-Text ────────────────────────────────────────────────
     console.log("🎙️ Sending to Speech-to-Text...");
     const audioBytes = fs.readFileSync(wavPath).toString("base64");
 
     const [speechResponse] = await speechClient.recognize({
       audio: { content: audioBytes },
       config: {
-  encoding: "LINEAR16",
-  sampleRateHertz: 16000,
-  languageCode: language === "ur-PK" ? "ur-PK" : "en-US",
-  alternativeLanguageCodes: language === "both" ? ["ur-PK", "en-US"] : [],
-  enableAutomaticPunctuation: true,
-  ...(language !== "ur-PK" && {
-    enableSpeakerDiarization: true,
-    diarizationSpeakerCount: 3,
-    model: "latest_long",
-  }),
-},
+        encoding: "LINEAR16",
+        sampleRateHertz: 16000,
+        languageCode: language === "ur-PK" ? "ur-PK" : "en-US",
+        alternativeLanguageCodes: language === "both" ? ["ur-PK", "en-US"] : [],
+        enableAutomaticPunctuation: true,
+        ...(language !== "ur-PK" && {
+          enableSpeakerDiarization: true,
+          diarizationSpeakerCount: 3,
+          model: "latest_long",
+        }),
+      },
     });
 
     const transcript = speechResponse.results
@@ -154,10 +172,9 @@ app.post("/api/analyze", upload.single("audio"), async (req, res) => {
     console.log(`✅ Transcript ready: "${transcript.substring(0, 80)}..."`);
     console.log(`📝 Word count: ${transcript.split(" ").length}`);
 
-    // ── Step 4: Send to Gemini ────────────────────────────────────────────────
+    // ── Step 4: Gemini ────────────────────────────────────────────────────────
     console.log("🧠 Sending to Gemini...");
-    const geminiResult = await geminiModel.generateContent(buildGeminiPrompt(transcript));
-    const geminiText = geminiResult.response.text();
+    const geminiText = await callGemini(buildGeminiPrompt(transcript));
 
     let aiResults;
     try {
@@ -193,8 +210,8 @@ app.post("/api/analyze-text", async (req, res) => {
 
   try {
     console.log("🧠 Analyzing text with Gemini...");
-    const geminiResult = await geminiModel.generateContent(buildGeminiPrompt(transcript));
-    const cleaned = geminiResult.response.text().replace(/```json|```/g, "").trim();
+    const geminiText = await callGemini(buildGeminiPrompt(transcript));
+    const cleaned = geminiText.replace(/```json|```/g, "").trim();
     const aiResults = JSON.parse(cleaned);
     console.log("✅ Text analysis complete!");
     res.json({ success: true, transcript, wordCount: transcript.split(" ").length, ...aiResults });
@@ -210,16 +227,23 @@ app.post("/api/live-update", async (req, res) => {
   if (!transcript) return res.status(400).json({ error: "No transcript provided" });
 
   try {
-    const geminiResult = await geminiModel.generateContent(buildGeminiPrompt(transcript, false));
-    const cleaned = geminiResult.response.text().replace(/```json|```/g, "").trim();
+    const geminiText = await callGemini(buildGeminiPrompt(transcript, false));
+    const cleaned = geminiText.replace(/```json|```/g, "").trim();
     const aiResults = JSON.parse(cleaned);
     res.json({ success: true, ...aiResults });
   } catch (error) {
     console.error("❌ Live update error:", error.message);
-    res.status(500).json({ error: error.message });
+    // Always return valid JSON so frontend doesn't crash
+    res.status(200).json({
+      success: false,
+      summary: "AI update temporarily unavailable. Will retry shortly.",
+      actionItems: [],
+      keyPoints: [],
+    });
   }
 });
-// ─── ROUTE 4: Live audio chunk → quick transcript ────────────────────────────
+
+// ─── ROUTE 4: Live audio chunk → transcript ───────────────────────────────────
 app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
   const filePath = req.file?.path;
   const wavPath = filePath + ".wav";
@@ -227,10 +251,10 @@ app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No chunk" });
 
-    // Convert webm chunk to WAV
-    await execAsync(`ffmpeg -y -f webm -i "${filePath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${wavPath}" 2>/dev/null || ffmpeg -y -f matroska -i "${filePath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${wavPath}"`);
+    await execAsync(`ffmpeg -y -i "${filePath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${wavPath}"`);
 
-    
+    const wavSize = fs.existsSync(wavPath) ? fs.statSync(wavPath).size : 0;
+    if (wavSize < 5000) return res.json({ success: true, transcript: "" });
 
     const audioBytes = fs.readFileSync(wavPath).toString("base64");
 
@@ -241,7 +265,8 @@ app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
         sampleRateHertz: 16000,
         languageCode: "en-US",
         enableAutomaticPunctuation: true,
-        model: "latest_short", // fastest model for short chunks
+        useEnhanced: true,
+        model: "phone_call",
       },
     });
 
@@ -250,24 +275,23 @@ app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
       .join(" ")
       .trim();
 
-      console.log(`🎬 Chunk transcript: "${transcript}" (${speechResponse.results.length} results)`);
-
+    console.log(`🎬 Chunk transcript: "${transcript}"`);
     res.json({ success: true, transcript });
 
   } catch (error) {
-    // Don't crash on empty chunks — just return empty
+    console.error("❌ Chunk error:", error.message);
     res.json({ success: true, transcript: "" });
   } finally {
     cleanup(filePath, wavPath);
   }
 });
 
-
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 MeetMind backend running on http://localhost:${PORT}`);
   console.log(`📡 Routes:`);
-  console.log(`   POST /api/analyze       → Upload audio/video file`);
-  console.log(`   POST /api/analyze-text  → Analyze text transcript`);
-  console.log(`   POST /api/live-update   → Live session AI updates\n`);
+  console.log(`   POST /api/analyze          → Upload audio/video file`);
+  console.log(`   POST /api/analyze-text     → Analyze text transcript`);
+  console.log(`   POST /api/live-update      → Live session AI updates`);
+  console.log(`   POST /api/transcribe-chunk → Live chunk transcription\n`);
 });
