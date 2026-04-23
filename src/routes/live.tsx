@@ -194,6 +194,8 @@ function LiveSession() {
       }
 
       streamRef.current = stream;
+      // Keep ref in sync immediately; setState is async and can lag one tick.
+      modeRef.current = "tab";
       setMode("tab");
       setConnected(true);
 
@@ -225,6 +227,12 @@ function LiveSession() {
           const blob = new Blob(chunks, { type: mimeType });
           console.log(`📤 Sending complete blob: ${blob.size} bytes`);
 
+          // Start next recording immediately so we don't lose words while
+          // this chunk uploads/transcribes on the backend.
+          if (modeRef.current === "tab") {
+            recordAndSend();
+          }
+
           if (blob.size > 5000 && !pausedRef.current) {
             const formData = new FormData();
             formData.append("chunk", blob, "audio.webm");
@@ -235,18 +243,22 @@ function LiveSession() {
                 body: formData,
               });
               const data = await res.json();
+              if (!res.ok || data.success === false) {
+                const backendError = data?.error || "Transcription service unavailable.";
+                setError(`Tab transcription error: ${backendError}`);
+                console.error("❌ Chunk transcription failed:", data);
+                return;
+              }
+
+              setError(null);
               console.log("✅ Transcript:", data.transcript);
               if (data.transcript) {
                 addSubtitleLine(data.transcript);
               }
             } catch (e) {
+              setError("Network error while sending tab audio chunk.");
               console.error("❌ Upload failed:", e);
             }
-          }
-
-          // Start next recording immediately
-          if (modeRef.current === "tab") {
-            recordAndSend();
           }
         };
 

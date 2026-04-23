@@ -246,15 +246,21 @@ app.post("/api/live-update", async (req, res) => {
 // ─── ROUTE 4: Live audio chunk → transcript ───────────────────────────────────
 app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
   const filePath = req.file?.path;
-  const wavPath = filePath + ".wav";
+  const wavPath = filePath ? filePath + ".wav" : null;
+  const startedAt = Date.now();
 
   try {
     if (!req.file) return res.status(400).json({ error: "No chunk" });
+    console.log(`📥 Chunk received: ${req.file.size} bytes`);
 
     await execAsync(`ffmpeg -y -i "${filePath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${wavPath}"`);
 
     const wavSize = fs.existsSync(wavPath) ? fs.statSync(wavPath).size : 0;
-    if (wavSize < 5000) return res.json({ success: true, transcript: "" });
+    console.log(`🎚️ Converted WAV size: ${wavSize} bytes`);
+    if (wavSize < 5000) {
+      console.log("⚠️ WAV too small, returning empty transcript");
+      return res.json({ success: true, transcript: "" });
+    }
 
     const audioBytes = fs.readFileSync(wavPath).toString("base64");
 
@@ -275,12 +281,18 @@ app.post("/api/transcribe-chunk", upload.single("chunk"), async (req, res) => {
       .join(" ")
       .trim();
 
-    console.log(`🎬 Chunk transcript: "${transcript}"`);
+    console.log(
+      `🎬 Chunk transcript length: ${transcript.length} chars · ${Date.now() - startedAt}ms`
+    );
     res.json({ success: true, transcript });
 
   } catch (error) {
-    console.error("❌ Chunk error:", error.message);
-    res.json({ success: true, transcript: "" });
+    console.error(`❌ Chunk error after ${Date.now() - startedAt}ms:`, error.message);
+    res.status(500).json({
+      success: false,
+      error: "Chunk transcription failed",
+      details: error.message,
+    });
   } finally {
     cleanup(filePath, wavPath);
   }
