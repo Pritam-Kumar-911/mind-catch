@@ -189,10 +189,13 @@ function UploadPage() {
                 <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="english">🇬🇧 English</SelectItem>
-                  <SelectItem value="urdu">🇵🇰 Urdu (اردو)</SelectItem>
+                  <SelectItem value="urdu">🇵🇰 Urdu (Beta)</SelectItem>
                   <SelectItem value="both">🌐 Both (English & Urdu)</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Urdu transcription is experimental in this version; accuracy may vary.
+              </p>
             </div>
             <Button
               variant="brand"

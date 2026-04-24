@@ -472,7 +472,7 @@ function LiveSession() {
                         : "hover:bg-accent/50 text-muted-foreground"
                     }`}
                   >
-                    Urdu
+                    Urdu (Beta)
                   </button>
                   <button
                     type="button"
@@ -510,6 +510,14 @@ function LiveSession() {
         <div className="mx-auto max-w-[1400px] w-full px-4 sm:px-6 pt-4">
           <div className="px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-sm">
             {error}
+          </div>
+        </div>
+      )}
+
+      {(mode === "tab" && (tabLanguage === "ur-PK" || tabLanguage === "both")) && (
+        <div className="mx-auto max-w-[1400px] w-full px-4 sm:px-6 pt-4">
+          <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-sm">
+            Urdu transcription is in beta for this prototype and may be less accurate than English.
           </div>
         </div>
       )}
