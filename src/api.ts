@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+// const BASE_URL = "https://meetmind-backend-992589154151.us-central1.run.app";
+const BASE_URL = "http://localhost:3001";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface ActionItem {

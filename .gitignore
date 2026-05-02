@@ -35,3 +35,6 @@ dist-ssr
 Backend/.env
 Backend/env.yaml
 Backend/.dockerignore
+.env.production
+Backend/meet-mind-494016-31c151f6a0c0.json
+Backend/uploads

@@ -243,6 +243,7 @@ function LiveSession() {
             formData.append("language", tabLanguageRef.current);
 
             try {
+              // const res = await fetch("https://meetmind-backend-992589154151.us-central1.run.app/api/transcribe-chunk", {
               const res = await fetch("http://localhost:3001/api/transcribe-chunk", {
                 method: "POST",
                 body: formData,

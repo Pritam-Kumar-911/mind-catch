@@ -11,14 +11,23 @@ import speech from "@google-cloud/speech";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Load Google credentials from environment variable
-if (process.env.GOOGLE_CREDENTIALS_BASE64) {
-  const creds = Buffer.from(
-    process.env.GOOGLE_CREDENTIALS_BASE64,
-    "base64"
-  ).toString("utf8");
-  fs.writeFileSync("/tmp/credentials.json", creds);
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/credentials.json";
-}
+// if (process.env.GOOGLE_CREDENTIALS_BASE64) {
+//   const creds = Buffer.from(
+//     process.env.GOOGLE_CREDENTIALS_BASE64,
+//     "base64"
+//   ).toString("utf8");
+//   fs.writeFileSync("/tmp/credentials.json", creds);
+//   process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/credentials.json";
+// }
+// Use mounted secret file directly
+
+// if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+//   process.env.GOOGLE_APPLICATION_CREDENTIALS = "/secrets/credentials.json";
+// }
+
+// const speechClient = new speech.SpeechClient();
+
+
 
 const execAsync = promisify(exec);
 dotenv.config();
