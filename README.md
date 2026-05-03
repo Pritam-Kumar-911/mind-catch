@@ -110,7 +110,7 @@ Gemini API key
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/Pritam-Kumar-911/mind-catch.git
+git clone https://github.com/Pritam-Kumar-911/Meet-Mind.git
 cd mind-catch
 ```
 
@@ -160,7 +160,7 @@ Backend runs on `http://localhost:3001`
 ## 📁 Project Structure
 
 ```
-mind-catch/
+Meet-Mind/
 ├── src/
 │   ├── routes/
 │   │   ├── index.tsx        # Landing page
